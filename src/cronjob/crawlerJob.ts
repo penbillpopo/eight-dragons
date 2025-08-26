@@ -5,7 +5,7 @@ import { CrawlerService } from '../crawler/crawler.service';
 import { LineService } from '../line/line.service';
 
 @Injectable()
-export class CrawlerJobJob {
+export class CrawlerJob {
   constructor(
     private readonly crawler: CrawlerService,
     private readonly lineService: LineService,

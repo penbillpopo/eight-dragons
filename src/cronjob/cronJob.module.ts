@@ -2,10 +2,10 @@
 import { Module } from '@nestjs/common';
 import { CrawlerModule } from '../crawler/crawler.module';
 import { LineModule } from '../line/line.module';
-import { CrawlerJobJob } from './crawlerJob';
+import { CrawlerJob } from './crawlerJob';
 
 @Module({
   imports: [CrawlerModule, LineModule],
-  providers: [CrawlerJobJob],
+  providers: [CrawlerJob],
 })
 export class JobsModule {}

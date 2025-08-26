@@ -4,7 +4,7 @@ import { AppService } from './app.service';
 import { CrawlerModule } from './crawler/crawler.module';
 import { LineModule } from './line/line.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { JobsModule } from './cronjob/cronjob.module';
+import { JobsModule } from './cronJob/cronJob.module';
 
 @Module({
   imports: [CrawlerModule, LineModule, JobsModule, ScheduleModule.forRoot()],
