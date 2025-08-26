@@ -31,3 +31,20 @@ export type BrokerFlowRow = {
   /** 買賣超（正 = 買超，負 = 賣超） */
   diff: number;
 };
+
+export type Broker = {
+  idx: number;
+  label: string;
+  buyAmt: number;
+  sellAmt: number;
+  diff: number;
+};
+export type Item = {
+  code: string;
+  name: string;
+  brokers: Broker[];
+  sumBuyAmt: number;
+  sumSellAmt: number;
+  sumDiff: number;
+};
+export type BrokersPayload = { count: number; data: Item[] };

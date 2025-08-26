@@ -50,15 +50,13 @@ export class CrawlerController {
       this.crawler.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: 1 }), // 新加坡商瑞銀
     ]);
     const r3 = this.crawler.trustToBroker(trust); // 投信轉券商格式（估）
-    await this.lineService.pushToGroup(
-      'Cac7e8944752e8224d336740b583fc6c5',
-      '三家同買股出爐！',
-    );
 
-    return this.crawler.overlapThreeBrokers(r1, r2, r3, {
+    const result = this.crawler.overlapThreeBrokers(r1, r2, r3, {
       sortBy: 'sum',
       labels: ['台灣摩根士丹利', '新加坡商瑞銀', '投信(估)'],
     });
+
+    return result;
   }
 
   /**

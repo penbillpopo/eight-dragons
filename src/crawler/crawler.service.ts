@@ -6,7 +6,7 @@ import type { AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
 import * as iconv from 'iconv-lite';
 import retry from 'async-retry';
-import { BrokerFlowRow, TrustBuyRow } from './types';
+import { BrokerFlowRow, BrokersPayload, TrustBuyRow } from './types';
 
 type NormalizedBrokerRow = {
   code: string;
@@ -368,5 +368,28 @@ export class CrawlerService {
     });
 
     return { count: result.length, data: result };
+  }
+  buildBrokersText(payload: BrokersPayload): string {
+    const n = (x: number) => x.toLocaleString('zh-TW');
+    const sign = (x: number) =>
+      x > 0 ? `+${n(x)}` : x < 0 ? `-${n(Math.abs(x))}` : '0';
+
+    const lines: string[] = [];
+    lines.push(`📊 券商/投信重疊清單（${payload.count} 檔）`);
+
+    payload.data.forEach((it, i) => {
+      lines.push(
+        `\n${i + 1}. ${it.code} ${it.name}｜淨買超 ${sign(it.sumDiff)}（買 ${n(
+          it.sumBuyAmt,
+        )}／賣 ${n(it.sumSellAmt)}）`,
+      );
+      for (const b of it.brokers) {
+        lines.push(
+          `   • ${b.label} ${sign(b.diff)}（買 ${n(b.buyAmt)}／賣 ${n(b.sellAmt)}）`,
+        );
+      }
+    });
+
+    return lines.join('\n');
   }
 }
