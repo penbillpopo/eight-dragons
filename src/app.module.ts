@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CrawlerModule } from './crawler/crawler.module';
+import { LineModule } from './line/line.module';
 
 @Module({
-  imports: [CrawlerModule],
+  imports: [CrawlerModule, LineModule],
   controllers: [AppController],
   providers: [AppService],
 })
