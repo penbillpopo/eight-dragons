@@ -12,7 +12,7 @@ export class CrawlerJob {
   ) {}
 
   // 每天下午6點推送三家同時買超（固定三家：1470、1650 + 投信(估)）
-  @Cron('0 0 18 * * *', { timeZone: 'Asia/Taipei' })
+  @Cron('0 10 18 * * *', { timeZone: 'Asia/Taipei' })
   async run() {
     const [trust, r1, r2] = await Promise.all([
       this.crawler.fetchTrustInvestDaily(),
