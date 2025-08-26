@@ -22,6 +22,9 @@ export class WebhookController {
     const secret = process.env.LINE_CHANNEL_SECRET ?? '';
 
     const bodyString = req.body.toString('utf8');
+    console.log('bodyString:', bodyString);
+    console.log('signature:', signature);
+    console.log('secret:', secret);
 
     // 簽章驗證（官方函式）
     const ok = validateSignature(bodyString, secret, signature);
