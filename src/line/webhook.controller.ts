@@ -41,7 +41,7 @@ export class WebhookController {
     for (const event of body.events) {
       if (event.source.type === 'group') {
         const gid = event.source.groupId;
-        console.log('Event in group:', gid);
+        console.log('group ID:', gid);
         if (event.type === 'join') {
           try {
             await this.line.pushToGroup(
