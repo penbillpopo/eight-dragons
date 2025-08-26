@@ -22,9 +22,6 @@ export class WebhookController {
     const secret = process.env.LINE_CHANNEL_SECRET ?? '';
 
     const bodyString = req.body.toString('utf8');
-    console.log('bodyString:', bodyString);
-    console.log('signature:', signature);
-    console.log('secret:', secret);
 
     // 簽章驗證（官方函式）
     const ok = validateSignature(bodyString, secret, signature);
@@ -47,7 +44,10 @@ export class WebhookController {
         console.log('Event in group:', gid);
         if (event.type === 'join') {
           try {
-            await this.line.pushToGroup(gid, `大家好～我已加入群組！${gid}`);
+            await this.line.pushToGroup(
+              gid,
+              `大家好～我會每天給你們報明牌，祝大家發大財！`,
+            );
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
             console.error('pushMessage failed:', message);

@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CrawlerService } from './crawler.service';
 import { CrawlerController } from './crawler.controller';
+import { LineService } from 'src/line/line.service';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { CrawlerController } from './crawler.controller';
     }),
   ],
   controllers: [CrawlerController],
-  providers: [CrawlerService],
+  providers: [CrawlerService, LineService],
   exports: [CrawlerService],
 })
 export class CrawlerModule {}
