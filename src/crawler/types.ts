@@ -1,5 +1,7 @@
 /** 投信買超一日 */
 export type TrustBuyRow = {
+  /** 日期 */
+  date: string;
   /** 排名 */
   rank: number;
   /** 股票代號 */
@@ -22,6 +24,8 @@ export type TrustBuyRow = {
 
 /** 券商進出 */
 export type BrokerFlowRow = {
+  /** 日期 */
+  date: string;
   /** 券商名稱 */
   broker: string;
   /** 買進張數或金額（依頁面欄位） */

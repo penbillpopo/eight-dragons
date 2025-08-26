@@ -152,6 +152,9 @@ export class CrawlerService {
     const $ = cheerio.load(html);
 
     const rows: TrustBuyRow[] = [];
+
+    const date = this.dateForTrustInvest(html) || '';
+
     $('table tr').each((_, tr) => {
       const tds = $(tr).find('td');
       if (tds.length < 8) return;
@@ -172,7 +175,18 @@ export class CrawlerService {
       const sell = this.toNumber($(tds[6]).text());
       const net = this.toNumber($(tds[7]).text());
 
-      rows.push({ rank, code, name, close, change, changePct, buy, sell, net });
+      rows.push({
+        date,
+        rank,
+        code,
+        name,
+        close,
+        change,
+        changePct,
+        buy,
+        sell,
+        net,
+      });
     });
 
     return rows.filter((r) => r.code !== '').sort((a, b) => a.rank - b.rank);
@@ -211,7 +225,13 @@ export class CrawlerService {
       const sellAmt = Math.round(safe(r.sell) * safe(r.close));
       const diff = Math.round(safe(r.net) * safe(r.close));
       // 用「代碼 空格 名稱」讓後續 parseCodeName 的 fallback 能解析
-      return { broker: `${r.code} ${r.name}`, buyAmt, sellAmt, diff };
+      return {
+        broker: `${r.code} ${r.name}`,
+        buyAmt,
+        sellAmt,
+        diff,
+        date: r.date,
+      };
     });
   }
 
@@ -226,6 +246,8 @@ export class CrawlerService {
     const url = `https://fubon-ebrokerdj.fbs.com.tw/z/zg/zgb/zgb0.djhtm?${search.toString()}`;
     const html = await this.fetchHtml(url);
     const $ = cheerio.load(html);
+
+    const date = this.dateForBrokerFlow(html) || '';
 
     // 找最像資料表的 table（欄數>=4 且數字列較多）
     const tables = $('table').toArray();
@@ -273,7 +295,7 @@ export class CrawlerService {
 
       if (buyAmt === 0 && sellAmt === 0 && diff === 0) return;
 
-      rows.push({ broker, buyAmt, sellAmt, diff });
+      rows.push({ date, broker, buyAmt, sellAmt, diff });
     });
 
     return rows;
@@ -369,13 +391,15 @@ export class CrawlerService {
 
     return { count: result.length, data: result };
   }
-  buildBrokersText(payload: BrokersPayload): string {
+
+  /** 產生文字報告 */
+  buildBrokersText(payload: BrokersPayload, date: string): string {
     const n = (x: number) => x.toLocaleString('zh-TW');
     const sign = (x: number) =>
       x > 0 ? `+${n(x)}` : x < 0 ? `-${n(Math.abs(x))}` : '0';
 
     const lines: string[] = [];
-    lines.push(`📊 券商/投信重疊清單（${payload.count} 檔）`);
+    lines.push(`📊 券商/投信重疊清單（${payload.count} 檔）日期:${date}`);
 
     payload.data.forEach((it, i) => {
       lines.push(
@@ -391,5 +415,64 @@ export class CrawlerService {
     });
 
     return lines.join('\n');
+  }
+
+  checkAllDateAreSame(
+    r1: BrokerFlowRow[],
+    r2: BrokerFlowRow[],
+    r3: BrokerFlowRow[],
+  ): string {
+    const d1 = new Set(r1.map((x) => x.date).filter((x) => x));
+    const d2 = new Set(r2.map((x) => x.date).filter((x) => x));
+    const d3 = new Set(r3.map((x) => x.date).filter((x) => x));
+    return d1.size === 1 &&
+      d2.size === 1 &&
+      d3.size === 1 &&
+      [...d1][0] === [...d2][0] &&
+      [...d2][0] === [...d3][0]
+      ? [...d1][0]
+      : '';
+  }
+
+  private dateForTrustInvest(html: string): string | undefined {
+    const $ = cheerio.load(html);
+
+    // 只取文字裡含「日期」的 .t11，避免抓到同 class 的其他元素
+    const raw = $('div.t11')
+      .filter((_, el) => $(el).text().includes('日期'))
+      .first()
+      .text()
+      .trim(); // 例： "日期：08/26"
+
+    if (!raw) return;
+
+    // 先找 YYYY/MM/DD 或 YYYY-MM-DD
+    const ymd = raw.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    if (ymd) {
+      const [_, y, m, d] = ymd;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    // 再找 MM/DD（頁面只顯示月日的情況）
+    const md = raw.match(/(\d{1,2})[\/-](\d{1,2})/);
+    if (md) {
+      const now = new Date();
+      let y = now.getFullYear();
+      const m = Number(md[1]);
+      const d = Number(md[2]);
+      // 若今天是 1 月但頁面顯示 12 月，視為去年的資料
+      if (now.getMonth() + 1 === 1 && m === 12) y -= 1;
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  private dateForBrokerFlow(raw: string): string | undefined {
+    // 去空白，容許「資料日期:」「資料日期：」
+    const cleaned = raw.replace(/\s+/g, '');
+    const m = cleaned.match(/資料日期[:：]?(\d{4})(\d{2})(\d{2})/);
+    if (!m) return;
+
+    const [, y, mm, dd] = m;
+    return `${y}-${mm}-${dd}`; // -> 2025-08-25
   }
 }

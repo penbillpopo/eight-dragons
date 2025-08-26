@@ -46,7 +46,7 @@ export class WebhookController {
           try {
             await this.line.pushToGroup(
               gid,
-              `大家好～我會每天給你們報明牌，祝大家發大財！\n
+              `大家好～我會每天下午6點推送三家同時買超，祝大家發大財！\n
               [GroupId: ${gid}]`,
             );
           } catch (err: unknown) {
