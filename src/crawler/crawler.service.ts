@@ -284,7 +284,7 @@ export class CrawlerService {
    * options.labels: 依序為三個來源的名稱（例如：['台灣摩根士丹利','新加坡瑞銀','投信(估)']）
    * options.sortBy: 'sum' 以三家買入總和排序、'first' 以第一家買入排序
    */
-  async overlapThreeBrokers(
+  overlapThreeBrokers(
     r1: BrokerFlowRow[],
     r2: BrokerFlowRow[],
     r3: BrokerFlowRow[],
@@ -292,7 +292,7 @@ export class CrawlerService {
       sortBy?: 'sum' | 'first';
       labels?: [string, string, string];
     } = {},
-  ): Promise<{ count: number; data: OverlapItem[] }> {
+  ): { count: number; data: OverlapItem[] } {
     const sortBy = options.sortBy ?? 'sum';
     const [label1, label2, label3] = options.labels ?? ['#1', '#2', '#3'];
 
