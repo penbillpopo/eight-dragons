@@ -30,7 +30,7 @@ export class CrawlerJob {
     }
   }
 
-  @Cron('0 4 26 * * *', { timeZone: 'Asia/Taipei' })
+  @Cron('0 32 16 * * *', { timeZone: 'Asia/Taipei' })
   async runTest() {
     const { result, date } = await this.crawler.getOverlapAllFixed();
     await this.lineService.pushToGroup(
