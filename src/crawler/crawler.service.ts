@@ -16,20 +16,20 @@ type NormalizedBrokerRow = {
   diff: number;
 };
 
-export type OverlapItem = {
+export interface OverlapItem {
   code: string;
   name: string;
-  brokers: Array<{
-    idx: 1 | 2 | 3;
-    label: string; // 券商名稱（或來源標籤）
+  brokers: {
+    idx: number; // 原本是 1 | 2 | 3，改成 number
+    label: string;
     buyAmt: number;
     sellAmt: number;
     diff: number;
-  }>;
+  }[];
   sumBuyAmt: number;
   sumSellAmt: number;
   sumDiff: number;
-};
+}
 
 @Injectable()
 export class CrawlerService {
@@ -145,51 +145,16 @@ export class CrawlerService {
     return m;
   }
 
-  /** 投信買超一日（上市+上櫃合併） */
-  async fetchTrustInvestDaily(): Promise<TrustBuyRow[]> {
+  /** 投信買超一日(上市) */
+  async fetchTrustInvestListedDaily(): Promise<TrustBuyRow[]> {
     const url = 'https://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_DD_0_1.djhtm';
-    const html = await this.fetchHtml(url);
-    const $ = cheerio.load(html);
+    return this._fetchTrustInvestDaily(url);
+  }
 
-    const rows: TrustBuyRow[] = [];
-
-    const date = this.dateForTrustInvest(html) || '';
-
-    $('table tr').each((_, tr) => {
-      const tds = $(tr).find('td');
-      if (tds.length < 8) return;
-
-      const rankTxt = $(tds[0]).text().trim();
-      const rank = Number.parseInt(rankTxt, 10);
-      if (!Number.isFinite(rank)) return;
-
-      const nameCode = $(tds[1]).text().trim(); // 例如 "2330 台積電"
-      const [code, ...nameParts] = nameCode.split(/\s+/);
-      if (!code) return;
-      const name = nameParts.join(' ').trim();
-
-      const close = this.toNumber($(tds[2]).text());
-      const change = $(tds[3]).text().trim();
-      const changePct = $(tds[4]).text().trim();
-      const buy = this.toNumber($(tds[5]).text());
-      const sell = this.toNumber($(tds[6]).text());
-      const net = this.toNumber($(tds[7]).text());
-
-      rows.push({
-        date,
-        rank,
-        code,
-        name,
-        close,
-        change,
-        changePct,
-        buy,
-        sell,
-        net,
-      });
-    });
-
-    return rows.filter((r) => r.code !== '').sort((a, b) => a.rank - b.rank);
+  /** 投信買超一日(上櫃) */
+  async fetchTrustInvestOTCDaily(): Promise<TrustBuyRow[]> {
+    const url = 'https://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_DD_1_1.djhtm';
+    return this._fetchTrustInvestDaily(url);
   }
 
   /** 券商進出（參數化） */
@@ -233,6 +198,52 @@ export class CrawlerService {
         date: r.date,
       };
     });
+  }
+
+  /** 投信買超一日 */
+  private async _fetchTrustInvestDaily(url: string): Promise<TrustBuyRow[]> {
+    const html = await this.fetchHtml(url);
+    const $ = cheerio.load(html);
+
+    const rows: TrustBuyRow[] = [];
+
+    const date = this.dateForTrustInvest(html) || '';
+
+    $('table tr').each((_, tr) => {
+      const tds = $(tr).find('td');
+      if (tds.length < 8) return;
+
+      const rankTxt = $(tds[0]).text().trim();
+      const rank = Number.parseInt(rankTxt, 10);
+      if (!Number.isFinite(rank)) return;
+
+      const nameCode = $(tds[1]).text().trim(); // 例如 "2330 台積電"
+      const [code, ...nameParts] = nameCode.split(/\s+/);
+      if (!code) return;
+      const name = nameParts.join(' ').trim();
+
+      const close = this.toNumber($(tds[2]).text());
+      const change = $(tds[3]).text().trim();
+      const changePct = $(tds[4]).text().trim();
+      const buy = this.toNumber($(tds[5]).text());
+      const sell = this.toNumber($(tds[6]).text());
+      const net = this.toNumber($(tds[7]).text());
+
+      rows.push({
+        date,
+        rank,
+        code,
+        name,
+        close,
+        change,
+        changePct,
+        buy,
+        sell,
+        net,
+      });
+    });
+
+    return rows.filter((r) => r.code !== '').sort((a, b) => a.rank - b.rank);
   }
 
   /** 核心抓取：富邦「券商進出」頁 */
@@ -300,92 +311,121 @@ export class CrawlerService {
 
     return rows;
   }
-
   /**
-   * 三家「同時買超」交集清單（直接吃三個 BrokerFlowRow[]）。
-   * options.labels: 依序為三個來源的名稱（例如：['台灣摩根士丹利','新加坡瑞銀','投信(估)']）
-   * options.sortBy: 'sum' 以三家買入總和排序、'first' 以第一家買入排序
+   * 任意家券商「同時買超」交集清單。
+   * @param lists BrokerFlowRow 的二維陣列；每個內層陣列是某一家來源的清單
+   * @param options.sortBy 'sum' 以所有家買入總和排序（預設）、'first' 以第一家買入排序
+   * @param options.labels 與 lists 等長；若未提供則自動產生 ['#1', '#2', ...]
+   * @param options.requireAll 預設 true：要所有清單都出現；false 則可指定最少出現家數 minAppear
+   * @param options.minAppear 當 requireAll=false 時生效，預設 2
+   * @param options.overlapMode 'all' 要所有清單都出現（等同 requireAll=true）、'atLeast' 至少 minAppear 家、'max' 出現最多家的（不需指定 minAppear）；預設 'atLeast'
    */
-  overlapThreeBrokers(
-    r1: BrokerFlowRow[],
-    r2: BrokerFlowRow[],
-    r3: BrokerFlowRow[],
+  overlapBrokers(
+    lists: BrokerFlowRow[][],
     options: {
       sortBy?: 'sum' | 'first';
-      labels?: [string, string, string];
+      labels?: string[];
+      requireAll?: boolean; // 仍保留，向下相容
+      minAppear?: number; // 仍保留，向下相容
+      overlapMode?: 'all' | 'atLeast' | 'max'; // ★ 新增
     } = {},
   ): { count: number; data: OverlapItem[] } {
     const sortBy = options.sortBy ?? 'sum';
-    const [label1, label2, label3] = options.labels ?? ['#1', '#2', '#3'];
+    const overlapMode =
+      options.overlapMode ?? (options.requireAll ? 'all' : 'atLeast');
+    const minAppear = Math.max(2, options.minAppear ?? 2);
 
-    // 標準化 + 僅保留買超
-    const n1 = this.normalizeRows(r1).filter(
-      (x) => x.diff > 0 || x.buyAmt > x.sellAmt,
-    );
-    const n2 = this.normalizeRows(r2).filter(
-      (x) => x.diff > 0 || x.buyAmt > x.sellAmt,
-    );
-    const n3 = this.normalizeRows(r3).filter(
-      (x) => x.diff > 0 || x.buyAmt > x.sellAmt,
-    );
+    if (!lists?.length) return { count: 0, data: [] };
 
-    // 合併同清單內重覆項目（若有）
-    const m1 = this.mergeByCode(n1);
-    const m2 = this.mergeByCode(n2);
-    const m3 = this.mergeByCode(n3);
-
-    const i2 = new Map<string, NormalizedBrokerRow>(
-      [...m2.values()].map((x) => [x.code, x]),
-    );
-    const i3 = new Map<string, NormalizedBrokerRow>(
-      [...m3.values()].map((x) => [x.code, x]),
+    // 1) 每家：標準化 + 只留買超 + 同家內合併
+    const mergedPerBroker: Map<string, NormalizedBrokerRow>[] = lists.map(
+      (r) => {
+        const n = this.normalizeRows(r).filter(
+          (x) => x.diff > 0 || x.buyAmt > x.sellAmt,
+        );
+        return this.mergeByCode(n); // Map<code, row>
+      },
     );
 
+    // 2) 產生標籤
+    const labels =
+      options.labels && options.labels.length === mergedPerBroker.length
+        ? options.labels
+        : Array.from({ length: mergedPerBroker.length }, (_, i) => `#${i + 1}`);
+
+    // 3) 蒐集所有代碼出現次數
+    const appearCount = new Map<string, number>();
+    for (const m of mergedPerBroker) {
+      for (const code of m.keys()) {
+        appearCount.set(code, (appearCount.get(code) ?? 0) + 1);
+      }
+    }
+
+    // 3.5) 依照 overlapMode 決定門檻
+    let needAppear: number;
+    if (overlapMode === 'all') {
+      needAppear = mergedPerBroker.length;
+    } else if (overlapMode === 'max') {
+      // ★ 最多交集：找出最大出現次數
+      let maxCnt = 0;
+      for (const cnt of appearCount.values()) maxCnt = Math.max(maxCnt, cnt);
+      needAppear = maxCnt;
+    } else {
+      // 'atLeast'
+      needAppear = minAppear;
+    }
+
+    // 4) 建立結果
     const result: OverlapItem[] = [];
-    for (const x of m1.values()) {
-      const y = i2.get(x.code);
-      if (!y) continue;
-      const z = i3.get(x.code);
-      if (!z) continue;
+    for (const [code, cnt] of appearCount) {
+      if (cnt < needAppear) continue;
 
-      const sumBuyAmt = x.buyAmt + y.buyAmt + z.buyAmt;
-      const sumSellAmt = x.sellAmt + y.sellAmt + z.sellAmt;
-      const sumDiff = x.diff + y.diff + z.diff;
+      const rows = mergedPerBroker.map((m) => m.get(code) ?? null);
+      const any = rows.find((r) => r);
+      if (!any) continue;
+
+      let sumBuyAmt = 0,
+        sumSellAmt = 0,
+        sumDiff = 0;
+
+      const brokers = rows.map((r, idx) => {
+        const buyAmt = r?.buyAmt ?? 0;
+        const sellAmt = r?.sellAmt ?? 0;
+        const diff = r?.diff ?? 0;
+        sumBuyAmt += buyAmt;
+        sumSellAmt += sellAmt;
+        sumDiff += diff;
+
+        // ★ 若 OverlapItem 型別限制 idx: 1 | 2 | 3 之類，做窄化轉型
+        const safeIdx = (idx + 1) as 1 | 2 | 3; // 視最多幾家調整
+
+        return {
+          idx: safeIdx,
+          label: labels[idx],
+          buyAmt,
+          sellAmt,
+          diff,
+        };
+      });
 
       result.push({
-        code: x.code,
-        name: x.name,
-        brokers: [
-          {
-            idx: 1,
-            label: label1,
-            buyAmt: x.buyAmt,
-            sellAmt: x.sellAmt,
-            diff: x.diff,
-          },
-          {
-            idx: 2,
-            label: label2,
-            buyAmt: y.buyAmt,
-            sellAmt: y.sellAmt,
-            diff: y.diff,
-          },
-          {
-            idx: 3,
-            label: label3,
-            buyAmt: z.buyAmt,
-            sellAmt: z.sellAmt,
-            diff: z.diff,
-          },
-        ],
+        code,
+        name: any.name,
+        brokers,
         sumBuyAmt,
         sumSellAmt,
         sumDiff,
       });
     }
 
+    // 5) 排序（先依需求排序，再可選 tie-breaker）
     result.sort((a, b) => {
-      if (sortBy === 'first') return b.brokers[0].buyAmt - a.brokers[0].buyAmt;
+      if (sortBy === 'first') {
+        return (
+          (b.brokers[0]?.buyAmt ?? 0) - (a.brokers[0]?.buyAmt ?? 0) ||
+          b.sumBuyAmt - a.sumBuyAmt
+        );
+      }
       return b.sumBuyAmt - a.sumBuyAmt;
     });
 
@@ -394,44 +434,62 @@ export class CrawlerService {
 
   /** 產生文字報告 */
   buildBrokersText(payload: BrokersPayload, date: string): string {
-    const n = (x: number) => x.toLocaleString('zh-TW');
-    const sign = (x: number) =>
-      x > 0 ? `+${n(x)}` : x < 0 ? `-${n(Math.abs(x))}` : '0';
-
     const lines: string[] = [];
-    lines.push(`📊 券商/投信重疊清單（${payload.count} 檔）日期:${date}`);
-
+    lines.push(
+      `📊 券商/投信上市上櫃重疊清單（${payload.count} 檔）日期:${date}`,
+    );
     payload.data.forEach((it, i) => {
-      lines.push(
-        `\n${i + 1}. ${it.code} ${it.name}｜淨買超 ${sign(it.sumDiff)}（買 ${n(
-          it.sumBuyAmt,
-        )}／賣 ${n(it.sumSellAmt)}）`,
-      );
-      for (const b of it.brokers) {
-        lines.push(
-          `   • ${b.label} ${sign(b.diff)}（買 ${n(b.buyAmt)}／賣 ${n(b.sellAmt)}）`,
-        );
-      }
+      lines.push(`\n${i + 1}. ${it.code} ${it.name}`);
     });
 
     return lines.join('\n');
   }
 
-  checkAllDateAreSame(
-    r1: BrokerFlowRow[],
-    r2: BrokerFlowRow[],
-    r3: BrokerFlowRow[],
-  ): string {
-    const d1 = new Set(r1.map((x) => x.date).filter((x) => x));
-    const d2 = new Set(r2.map((x) => x.date).filter((x) => x));
-    const d3 = new Set(r3.map((x) => x.date).filter((x) => x));
-    return d1.size === 1 &&
-      d2.size === 1 &&
-      d3.size === 1 &&
-      [...d1][0] === [...d2][0] &&
-      [...d2][0] === [...d3][0]
-      ? [...d1][0]
-      : '';
+  checkAllDateAreSame(lists: BrokerFlowRow[][]): string {
+    if (!lists.length) return '';
+
+    // 每個清單取 date Set
+    const sets = lists.map(
+      (r) => new Set(r.map((x) => x.date).filter(Boolean)),
+    );
+
+    // 若有任何一個不是單一天，直接 return ''
+    if (sets.some((s) => s.size !== 1)) return '';
+
+    // 把每個 Set 的唯一值取出
+    const dates = sets.map((s) => [...s][0]);
+
+    // 全部一致才回傳
+    const first = dates[0];
+    return dates.every((d) => d === first) ? first : '';
+  }
+
+  async getOverlapAllFixed() {
+    const [t1, t2, r1, r2] = await Promise.all([
+      this.fetchTrustInvestListedDaily(),
+      this.fetchTrustInvestOTCDaily(),
+      this.fetchBrokerFlow({ a: 1470, b: 1470, c: 'B', d: 1 }), // 台灣摩根士丹利
+      this.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: 1 }), // 新加坡商瑞銀
+    ]);
+    const r3 = this.trustToBroker(t1); // 投信轉券商格式（估）
+    const r4 = this.trustToBroker(t2); // 投信轉券商格式（估）
+
+    const result = this.overlapBrokers([r1, r2, r3, r4], {
+      sortBy: 'sum',
+      labels: [
+        '台灣摩根士丹利',
+        '新加坡商瑞銀',
+        '投信(估)-上市',
+        '投信(估)-上櫃',
+      ],
+      overlapMode: 'max',
+    });
+
+    const date = this.checkAllDateAreSame([r1, r2, r3, r4]) || '';
+    return {
+      result,
+      date,
+    };
   }
 
   private dateForTrustInvest(html: string): string | undefined {
