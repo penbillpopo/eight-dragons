@@ -9,7 +9,7 @@ export class CrawlerController {
   // 投信買超一日
   @Get('trust-buy-daily')
   async trustBuyDaily() {
-    const data = await this.crawler.fetchTrustInvestListedDaily();
+    const data = await this.crawler.fetchTrustInvestListed('1');
     return { count: data.length, data };
   }
 
@@ -40,6 +40,6 @@ export class CrawlerController {
   // 三家同時買超（固定三家：1470、1650 + 投信(估)）
   @Get('overlap-three-fixed')
   async overlapThreeFixed() {
-    return await this.crawler.getOverlapAllFixed();
+    return await this.crawler.getOverlapAllFixed(1);
   }
 }

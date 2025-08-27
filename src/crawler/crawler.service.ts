@@ -146,14 +146,14 @@ export class CrawlerService {
   }
 
   /** 投信買超一日(上市) */
-  async fetchTrustInvestListedDaily(): Promise<TrustBuyRow[]> {
-    const url = 'https://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_DD_0_1.djhtm';
+  async fetchTrustInvestListed(day: string): Promise<TrustBuyRow[]> {
+    const url = `https://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_DD_0_${day}.djhtm`;
     return this._fetchTrustInvestDaily(url);
   }
 
   /** 投信買超一日(上櫃) */
-  async fetchTrustInvestOTCDaily(): Promise<TrustBuyRow[]> {
-    const url = 'https://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_DD_1_1.djhtm';
+  async fetchTrustInvestOTC(day: string): Promise<TrustBuyRow[]> {
+    const url = `https://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_DD_1_${day}.djhtm`;
     return this._fetchTrustInvestDaily(url);
   }
 
@@ -433,10 +433,10 @@ export class CrawlerService {
   }
 
   /** 產生文字報告 */
-  buildBrokersText(payload: BrokersPayload, date: string): string {
+  buildBrokersText(payload: BrokersPayload, date: string, day: number): string {
     const lines: string[] = [];
     lines.push(
-      `📊 券商/投信上市上櫃重疊清單（${payload.count} 檔）日期:${date}`,
+      `📊 券商/投信上市上櫃${day.toString()}日重疊清單（${payload.count} 檔）日期:${date}`,
     );
     payload.data.forEach((it, i) => {
       lines.push(`\n${i + 1}. ${it.code} ${it.name}`);
@@ -464,12 +464,13 @@ export class CrawlerService {
     return dates.every((d) => d === first) ? first : '';
   }
 
-  async getOverlapAllFixed() {
+  // 三家同時買超（固定三家：1470、1650 + 投信(估)）
+  async getOverlapAllFixed(day: number) {
     const [t1, t2, r1, r2] = await Promise.all([
-      this.fetchTrustInvestListedDaily(),
-      this.fetchTrustInvestOTCDaily(),
-      this.fetchBrokerFlow({ a: 1470, b: 1470, c: 'B', d: 1 }), // 台灣摩根士丹利
-      this.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: 1 }), // 新加坡商瑞銀
+      this.fetchTrustInvestListed(day.toString()), // 投信(估)-上市
+      this.fetchTrustInvestOTC(day.toString()), // 投信(估)-上櫃
+      this.fetchBrokerFlow({ a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
+      this.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
     ]);
     const r3 = this.trustToBroker(t1); // 投信轉券商格式（估）
     const r4 = this.trustToBroker(t2); // 投信轉券商格式（估）

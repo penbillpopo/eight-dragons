@@ -14,29 +14,21 @@ export class CrawlerJob {
   // 每天下午6點推送三家同時買超（固定三家：1470、1650 + 投信(估)）
   @Cron('0 0 18 * * *', { timeZone: 'Asia/Taipei' })
   async run() {
-    const { result, date } = await this.crawler.getOverlapAllFixed();
-    if (date) {
-      await this.lineService.pushToGroup(
-        process.env.LINE_GROUP_ID ?? '',
-        this.crawler.buildBrokersText(result, date),
-      );
-    } else {
-      await this.lineService.pushToGroup(
-        process.env.LINE_GROUP_ID ?? '',
-        `今日資料尚未更新,請稍後手動查詢\n
-        https://eight-dragons.onrender.com/crawler/overlap-three-fixed
-        `,
-      );
-    }
+    await this.sendOverlapMessage(1);
+    await this.sendOverlapMessage(5);
   }
 
-  @Cron('0 39 16 * * *', { timeZone: 'Asia/Taipei' })
+  @Cron('0 25 17 * * *', { timeZone: 'Asia/Taipei' })
   async runTest() {
-    console.log('Test push at 16:32');
-    const { result, date } = await this.crawler.getOverlapAllFixed();
+    await this.sendOverlapMessage(1);
+    await this.sendOverlapMessage(5);
+  }
+
+  async sendOverlapMessage(day: number) {
+    const { result, date } = await this.crawler.getOverlapAllFixed(day);
     await this.lineService.pushToGroup(
       process.env.LINE_GROUP_ID_TEST ?? '',
-      this.crawler.buildBrokersText(result, date),
+      this.crawler.buildBrokersText(result, date, day),
     );
   }
 }

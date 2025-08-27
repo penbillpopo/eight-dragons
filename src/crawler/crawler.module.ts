@@ -1,13 +1,11 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { ScheduleModule } from '@nestjs/schedule';
 import { CrawlerService } from './crawler.service';
 import { CrawlerController } from './crawler.controller';
 import { LineService } from 'src/line/line.service';
 
 @Module({
   imports: [
-    ScheduleModule.forRoot(),
     HttpModule.register({
       timeout: 15000,
       maxRedirects: 5,
