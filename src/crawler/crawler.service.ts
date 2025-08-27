@@ -446,20 +446,22 @@ export class CrawlerService {
   }
 
   checkAllDateAreSame(lists: BrokerFlowRow[][]): string {
-    if (!lists.length) return '';
+    // 過濾掉空清單
+    const nonEmpty = lists.filter((r) => r.length > 0);
+    if (!nonEmpty.length) return '';
 
-    // 每個清單取 date Set
-    const sets = lists.map(
-      (r) => new Set(r.map((x) => x.date).filter(Boolean)),
+    // 每個清單抽日期 → 去掉空/null → 去重
+    const sets = nonEmpty.map(
+      (r) => new Set(r.map((x) => (x.date ?? '').trim()).filter(Boolean)),
     );
 
-    // 若有任何一個不是單一天，直接 return ''
+    // 如果有任何一個 Set 不是單一日期，直接 return ''
     if (sets.some((s) => s.size !== 1)) return '';
 
-    // 把每個 Set 的唯一值取出
+    // 把每個 Set 唯一的日期取出
     const dates = sets.map((s) => [...s][0]);
 
-    // 全部一致才回傳
+    // 檢查是否一致
     const first = dates[0];
     return dates.every((d) => d === first) ? first : '';
   }
