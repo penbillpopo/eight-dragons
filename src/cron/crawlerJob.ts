@@ -18,16 +18,16 @@ export class CrawlerJob {
     await this.sendOverlapMessage(5);
   }
 
-  @Cron('0 25 17 * * *', { timeZone: 'Asia/Taipei' })
-  async runTest() {
-    await this.sendOverlapMessage(1);
-    await this.sendOverlapMessage(5);
-  }
+  // @Cron('0 25 17 * * *', { timeZone: 'Asia/Taipei' })
+  // async runTest() {
+  //   await this.sendOverlapMessage(1);
+  //   await this.sendOverlapMessage(5);
+  // }
 
   async sendOverlapMessage(day: number) {
     const { result, date } = await this.crawler.getOverlapAllFixed(day);
     await this.lineService.pushToGroup(
-      process.env.LINE_GROUP_ID_TEST ?? '',
+      process.env.LINE_GROUP_ID ?? '',
       this.crawler.buildBrokersText(result, date, day),
     );
   }
