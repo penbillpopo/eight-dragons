@@ -27,6 +27,8 @@ export class CrawlerJob {
     await this.sendOverlapMessage_c('台灣摩根士丹利/投信上市上櫃', 5);
 
     await this.sendOverlapMessage_d('富邦新店/台灣摩根士丹利', 5);
+
+    await this.sendOverlapMessage_e('新加坡商瑞銀/台灣摩根士丹利', 3);
   }
 
   async sendOverlapMessage_a(text: string, day: number) {
@@ -55,6 +57,14 @@ export class CrawlerJob {
 
   async sendOverlapMessage_d(text: string, day: number) {
     const { result, date } = await this.crawler.getOverlapAllFixed_d(day);
+    await this.lineService.pushToGroup(
+      process.env.LINE_GROUP_ID ?? '',
+      this.crawler.buildBrokersText(result, date, text, day),
+    );
+  }
+
+  async sendOverlapMessage_e(text: string, day: number) {
+    const { result, date } = await this.crawler.getOverlapAllFixed_e(day);
     await this.lineService.pushToGroup(
       process.env.LINE_GROUP_ID ?? '',
       this.crawler.buildBrokersText(result, date, text, day),

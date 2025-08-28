@@ -569,6 +569,26 @@ export class CrawlerService {
     };
   }
 
+  // 兩家同時買超（固定兩家：新加坡商瑞銀 + 台灣摩根士丹利）
+  async getOverlapAllFixed_e(day: number) {
+    const [r1, r2] = await Promise.all([
+      this.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
+      this.fetchBrokerFlow({ a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
+    ]);
+
+    const result = this.overlapBrokers([r1, r2], {
+      sortBy: 'sum',
+      labels: ['新加坡商瑞銀', '台灣摩根士丹利'],
+      overlapMode: 'max',
+    });
+
+    const date = this.checkAllDateAreSame([r1, r2]) || '';
+    return {
+      result,
+      date,
+    };
+  }
+
   private dateForTrustInvest(html: string): string | undefined {
     const $ = cheerio.load(html);
 
