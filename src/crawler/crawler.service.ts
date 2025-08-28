@@ -441,7 +441,7 @@ export class CrawlerService {
   ): string {
     const lines: string[] = [];
     lines.push(
-      `📊 ${text}${day.toString()}日重疊清單（${payload.count} 檔）日期:${date}`,
+      `📊 ${text} \n${day.toString()}日重疊清單 （共${payload.count}檔）\n日期:${date}`,
     );
     payload.data.forEach((it, i) => {
       lines.push(`\n${i + 1}. ${it.code} ${it.name}`);
