@@ -10,25 +10,54 @@ export class CrawlerJob {
     private readonly crawler: CrawlerService,
     private readonly lineService: LineService,
   ) {}
-
   // 每天下午6點推送三家同時買超（固定三家：1470、1650 + 投信(估)）
-  @Cron('0 0 18 * * *', { timeZone: 'Asia/Taipei' })
+  @Cron(process.env.CRON_TIME || '0 0 18 * * *', { timeZone: 'Asia/Taipei' })
   async run() {
-    await this.sendOverlapMessage(1);
-    await this.sendOverlapMessage(5);
+    await this.sendOverlapMessage_a(
+      '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
+      1,
+    );
+    await this.sendOverlapMessage_a(
+      '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
+      5,
+    );
+
+    await this.sendOverlapMessage_b('新加坡商瑞銀/投信上市上櫃', 5);
+
+    await this.sendOverlapMessage_c('台灣摩根士丹利/投信上市上櫃', 5);
+
+    await this.sendOverlapMessage_d('富邦新店/台灣摩根士丹利', 5);
   }
 
-  // @Cron('0 25 17 * * *', { timeZone: 'Asia/Taipei' })
-  // async runTest() {
-  //   await this.sendOverlapMessage(1);
-  //   await this.sendOverlapMessage(5);
-  // }
-
-  async sendOverlapMessage(day: number) {
-    const { result, date } = await this.crawler.getOverlapAllFixed(day);
+  async sendOverlapMessage_a(text: string, day: number) {
+    const { result, date } = await this.crawler.getOverlapAllFixed_a(day);
     await this.lineService.pushToGroup(
       process.env.LINE_GROUP_ID ?? '',
-      this.crawler.buildBrokersText(result, date, day),
+      this.crawler.buildBrokersText(result, date, text, day),
+    );
+  }
+
+  async sendOverlapMessage_b(text: string, day: number) {
+    const { result, date } = await this.crawler.getOverlapAllFixed_b(day);
+    await this.lineService.pushToGroup(
+      process.env.LINE_GROUP_ID ?? '',
+      this.crawler.buildBrokersText(result, date, text, day),
+    );
+  }
+
+  async sendOverlapMessage_c(text: string, day: number) {
+    const { result, date } = await this.crawler.getOverlapAllFixed_c(day);
+    await this.lineService.pushToGroup(
+      process.env.LINE_GROUP_ID ?? '',
+      this.crawler.buildBrokersText(result, date, text, day),
+    );
+  }
+
+  async sendOverlapMessage_d(text: string, day: number) {
+    const { result, date } = await this.crawler.getOverlapAllFixed_d(day);
+    await this.lineService.pushToGroup(
+      process.env.LINE_GROUP_ID ?? '',
+      this.crawler.buildBrokersText(result, date, text, day),
     );
   }
 }

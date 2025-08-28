@@ -40,6 +40,6 @@ export class CrawlerController {
   // 三家同時買超（固定三家：1470、1650 + 投信(估)）
   @Get('overlap-three-fixed')
   async overlapThreeFixed() {
-    return await this.crawler.getOverlapAllFixed(1);
+    return await this.crawler.getOverlapAllFixed_a(1);
   }
 }
