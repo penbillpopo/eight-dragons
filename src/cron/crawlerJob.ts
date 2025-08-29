@@ -14,22 +14,24 @@ export class CrawlerJob {
   // 每天下午6點推送三家同時買超（固定三家：1470、1650 + 投信(估)）
   @Cron(process.env.CRON_TIME || '0 0 20 * * *', { timeZone: 'Asia/Taipei' })
   async run() {
-    await this.sendOverlapMessage_a(
-      '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
-      1,
-    );
-    await this.sendOverlapMessage_a(
-      '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
-      5,
-    );
+    // await this.sendOverlapMessage_a(
+    //   '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
+    //   1,
+    //   'buy',
+    // );
+    // await this.sendOverlapMessage_a(
+    //   '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
+    //   5,
+    //   'buy',
+    // );
 
-    await this.sendOverlapMessage_b('新加坡商瑞銀/投信上市上櫃', 5);
+    // await this.sendOverlapMessage_b('新加坡商瑞銀/投信上市上櫃', 5, 'buy');
 
-    await this.sendOverlapMessage_c('台灣摩根士丹利/投信上市上櫃', 5);
+    // await this.sendOverlapMessage_c('台灣摩根士丹利/投信上市上櫃', 5, 'buy');
 
-    await this.sendOverlapMessage_d('富邦新店/台灣摩根士丹利', 5);
+    // await this.sendOverlapMessage_d('富邦新店/台灣摩根士丹利', 5, 'buy');
 
-    await this.sendOverlapMessage_e('新加坡商瑞銀/台灣摩根士丹利', 3);
+    // await this.sendOverlapMessage_e('新加坡商瑞銀/台灣摩根士丹利', 3, 'buy');
 
     await this.sendOverlapMessage_a(
       '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
