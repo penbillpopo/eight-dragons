@@ -38,19 +38,19 @@ export class CrawlerJob {
       1,
       'sell',
     );
-    await this.sendOverlapMessage_a(
-      '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
-      5,
-      'sell',
-    );
+    // await this.sendOverlapMessage_a(
+    //   '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
+    //   5,
+    //   'sell',
+    // );
 
-    await this.sendOverlapMessage_b('新加坡商瑞銀/投信上市上櫃', 5, 'sell');
+    // await this.sendOverlapMessage_b('新加坡商瑞銀/投信上市上櫃', 5, 'sell');
 
-    await this.sendOverlapMessage_c('台灣摩根士丹利/投信上市上櫃', 5, 'sell');
+    // await this.sendOverlapMessage_c('台灣摩根士丹利/投信上市上櫃', 5, 'sell');
 
-    await this.sendOverlapMessage_d('富邦新店/台灣摩根士丹利', 5, 'sell');
+    // await this.sendOverlapMessage_d('富邦新店/台灣摩根士丹利', 5, 'sell');
 
-    await this.sendOverlapMessage_e('新加坡商瑞銀/台灣摩根士丹利', 3, 'sell');
+    // await this.sendOverlapMessage_e('新加坡商瑞銀/台灣摩根士丹利', 3, 'sell');
   }
 
   async sendOverlapMessage_a(
