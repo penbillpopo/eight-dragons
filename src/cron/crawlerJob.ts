@@ -12,7 +12,7 @@ export class CrawlerJob {
     private readonly lineService: LineService,
   ) {}
   // 每天下午6點推送三家同時買超（固定三家：1470、1650 + 投信(估)）
-  @Cron(process.env.CRON_TIME || '0 0 18 * * *', { timeZone: 'Asia/Taipei' })
+  @Cron(process.env.CRON_TIME || '0 0 20 * * *', { timeZone: 'Asia/Taipei' })
   async run() {
     await this.sendOverlapMessage_a(
       '新加坡商瑞銀/台灣摩根士丹利/投信上市上櫃',
