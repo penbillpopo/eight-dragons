@@ -165,14 +165,17 @@ export class CrawlerService {
   }
 
   /** 券商進出（參數化） */
-  async fetchBrokerFlow(params: {
-    a: string | number;
-    b: string | number;
-    c?: string;
-    d?: string | number;
-    e?: string;
-    f?: string;
-  }): Promise<BrokerFlowRow[]> {
+  async fetchBrokerFlow(
+    type: 'D' | 'E' = 'D',
+    params: {
+      a: string | number;
+      b: string | number;
+      c?: string;
+      d?: string | number;
+      e?: string;
+      f?: string;
+    },
+  ): Promise<BrokerFlowRow[]> {
     const search = new URLSearchParams();
     search.set('a', String(params.a));
     search.set('b', String(params.b));
@@ -186,6 +189,7 @@ export class CrawlerService {
       search.get('b') ?? '',
       search.get('c') ?? '',
       search.get('d') ?? '',
+      type,
     );
   }
 
@@ -259,6 +263,7 @@ export class CrawlerService {
     b: string,
     c: string,
     d: string,
+    type: 'D' | 'E' = 'D',
   ): Promise<BrokerFlowRow[]> {
     const search = new URLSearchParams({ a, b, c, d });
     const url = `https://fubon-ebrokerdj.fbs.com.tw/z/zg/zgb/zgb0.djhtm?${search.toString()}`;
@@ -316,7 +321,11 @@ export class CrawlerService {
       rows.push({ date, broker, buyAmt, sellAmt, diff });
     });
 
-    return rows;
+    return rows.filter((r) =>
+      type === 'D'
+        ? r.diff > 0 || r.buyAmt > r.sellAmt
+        : r.diff < 0 || r.buyAmt < r.sellAmt,
+    );
   }
   /**
    * 任意家券商「同時買超」交集清單。
@@ -332,13 +341,15 @@ export class CrawlerService {
     options: {
       sortBy?: 'sum' | 'first';
       labels?: string[];
-      requireAll?: boolean; // 仍保留，向下相容
-      minAppear?: number; // 仍保留，向下相容
-      overlapMode?: 'all' | 'atLeast' | 'max'; // ★ 新增
-      searchType?: 'buy' | 'sell'; // 查詢買或賣超
+      requireAll?: boolean; // 兼容舊參數
+      minAppear?: number; // 兼容舊參數
+      overlapMode?: 'all' | 'atLeast' | 'max';
+      searchType?: 'buy' | 'sell'; // ★ 決定買/賣超交集
     } = {},
   ): { count: number; data: OverlapItem[] } {
     const searchType = options.searchType ?? 'buy';
+    const isBuy = searchType === 'buy';
+
     const sortBy = options.sortBy ?? 'sum';
     const overlapMode =
       options.overlapMode ?? (options.requireAll ? 'all' : 'atLeast');
@@ -346,11 +357,11 @@ export class CrawlerService {
 
     if (!lists?.length) return { count: 0, data: [] };
 
-    // 1) 每家：標準化 + 只留買/賣超 + 同家內合併
+    // 1) 每家：標準化 + 只留符合買/賣超的列 + 合併同代號
     const mergedPerBroker: Map<string, NormalizedBrokerRow>[] = lists.map(
       (r) => {
         const n = this.normalizeRows(r).filter((x) =>
-          searchType === 'buy'
+          isBuy
             ? x.diff > 0 || x.buyAmt > x.sellAmt
             : x.diff < 0 || x.buyAmt < x.sellAmt,
         );
@@ -364,7 +375,7 @@ export class CrawlerService {
         ? options.labels
         : Array.from({ length: mergedPerBroker.length }, (_, i) => `#${i + 1}`);
 
-    // 3) 蒐集所有代號出現次數
+    // 3) 蒐集所有代號出現次數（出現在多少清單中）
     const appearCount = new Map<string, number>();
     for (const m of mergedPerBroker) {
       for (const code of m.keys()) {
@@ -372,7 +383,7 @@ export class CrawlerService {
       }
     }
 
-    // 3.5) 依照 overlapMode 決定門檻
+    // 3.5) 依 overlapMode 決定門檻
     let needAppear: number;
     if (overlapMode === 'all') {
       needAppear = mergedPerBroker.length;
@@ -429,15 +440,26 @@ export class CrawlerService {
       });
     }
 
-    // 5) 排序（先依需求排序，再可選 tie-breaker）
+    // 5) 排序：依 searchType 切換指標
+    // - 買超：用 sumBuyAmt（或 sumDiff 正值也可）
+    // - 賣超：用 sumSellAmt（或 |sumDiff| 也可；這裡用 sumSellAmt）
     result.sort((a, b) => {
       if (sortBy === 'first') {
-        return (
-          (b.brokers[0]?.buyAmt ?? 0) - (a.brokers[0]?.buyAmt ?? 0) ||
-          b.sumBuyAmt - a.sumBuyAmt
-        );
+        // 第一清單的貢獻當主要排序，並以總量作為 tie-breaker
+        const aFirst = isBuy
+          ? (a.brokers[0]?.buyAmt ?? 0)
+          : (a.brokers[0]?.sellAmt ?? 0);
+        const bFirst = isBuy
+          ? (b.brokers[0]?.buyAmt ?? 0)
+          : (b.brokers[0]?.sellAmt ?? 0);
+        const aSum = isBuy ? a.sumBuyAmt : a.sumSellAmt;
+        const bSum = isBuy ? b.sumBuyAmt : b.sumSellAmt;
+        return bFirst - aFirst || bSum - aSum;
+      } else {
+        const aSum = isBuy ? a.sumBuyAmt : a.sumSellAmt;
+        const bSum = isBuy ? b.sumBuyAmt : b.sumSellAmt;
+        return bSum - aSum;
       }
-      return b.sumBuyAmt - a.sumBuyAmt;
     });
 
     return { count: result.length, data: result };
@@ -485,11 +507,12 @@ export class CrawlerService {
 
   // 三家同時買/賣超（固定三家：台灣摩根士丹利、新加坡商瑞銀 + 投信(估)）
   async getOverlapAllFixed_a(day: number, searchType: TSearchType) {
+    const type = searchType === 'buy' ? 'D' : 'E';
     const [t1, t2, r1, r2] = await Promise.all([
-      this.fetchTrustInvestListed('D', day.toString()), // 投信(估)-上市
-      this.fetchTrustInvestOTC('D', day.toString()), // 投信(估)-上櫃
-      this.fetchBrokerFlow({ a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
-      this.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
+      this.fetchTrustInvestListed(type, day.toString()), // 投信(估)-上市
+      this.fetchTrustInvestOTC(type, day.toString()), // 投信(估)-上櫃
+      this.fetchBrokerFlow(type, { a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
+      this.fetchBrokerFlow(type, { a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
     ]);
     const r3 = this.trustToBroker(t1); // 投信轉券商格式（估）
     const r4 = this.trustToBroker(t2); // 投信轉券商格式（估）
@@ -515,10 +538,11 @@ export class CrawlerService {
 
   // 兩家同時買/賣超（固定兩家：新加坡商瑞銀 + 投信(估)）
   async getOverlapAllFixed_b(day: number, searchType: TSearchType) {
+    const type = searchType === 'buy' ? 'D' : 'E';
     const [t1, t2, r1] = await Promise.all([
-      this.fetchTrustInvestListed('D', day.toString()), // 投信(估)-上市
-      this.fetchTrustInvestOTC('D', day.toString()), // 投信(估)-上櫃
-      this.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
+      this.fetchTrustInvestListed(type, day.toString()), // 投信(估)-上市
+      this.fetchTrustInvestOTC(type, day.toString()), // 投信(估)-上櫃
+      this.fetchBrokerFlow(type, { a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
     ]);
     const r2 = this.trustToBroker(t1); // 投信轉券商格式（估）
     const r3 = this.trustToBroker(t2); // 投信轉券商格式（估）
@@ -539,10 +563,11 @@ export class CrawlerService {
 
   // 兩家同時買/賣超（固定兩家：台灣摩根士丹利 + 投信(估)）
   async getOverlapAllFixed_c(day: number, searchType: TSearchType) {
+    const type = searchType === 'buy' ? 'D' : 'E';
     const [t1, t2, r1] = await Promise.all([
-      this.fetchTrustInvestListed('D', day.toString()), // 投信(估)-上市
-      this.fetchTrustInvestOTC('D', day.toString()), // 投信(估)-上櫃
-      this.fetchBrokerFlow({ a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
+      this.fetchTrustInvestListed(type, day.toString()), // 投信(估)-上市
+      this.fetchTrustInvestOTC(type, day.toString()), // 投信(估)-上櫃
+      this.fetchBrokerFlow(type, { a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
     ]);
     const r2 = this.trustToBroker(t1); // 投信轉券商格式（估）
     const r3 = this.trustToBroker(t2); // 投信轉券商格式（估）
@@ -563,10 +588,11 @@ export class CrawlerService {
 
   // 兩家同時買/賣超（固定兩家：富邦新店 + 投信(估)）
   async getOverlapAllFixed_d(day: number, searchType: TSearchType) {
+    const type = searchType === 'buy' ? 'D' : 'E';
     const [t1, t2, r1] = await Promise.all([
-      this.fetchTrustInvestListed('D', day.toString()), // 投信(估)-上市
-      this.fetchTrustInvestOTC('D', day.toString()), // 投信(估)-上櫃
-      this.fetchBrokerFlow({ a: 9600, b: 9661, c: 'B', d: day }), // 富邦新店
+      this.fetchTrustInvestListed(type, day.toString()), // 投信(估)-上市
+      this.fetchTrustInvestOTC(type, day.toString()), // 投信(估)-上櫃
+      this.fetchBrokerFlow(type, { a: 9600, b: 9661, c: 'B', d: day }), // 富邦新店
     ]);
     const r2 = this.trustToBroker(t1); // 投信轉券商格式（估）
     const r3 = this.trustToBroker(t2); // 投信轉券商格式（估）
@@ -587,9 +613,10 @@ export class CrawlerService {
 
   // 兩家同時買/賣超（固定兩家：新加坡商瑞銀 + 台灣摩根士丹利）
   async getOverlapAllFixed_e(day: number, searchType: TSearchType) {
+    const type = searchType === 'buy' ? 'D' : 'E';
     const [r1, r2] = await Promise.all([
-      this.fetchBrokerFlow({ a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
-      this.fetchBrokerFlow({ a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
+      this.fetchBrokerFlow(type, { a: 1650, b: 1650, c: 'B', d: day }), // 新加坡商瑞銀
+      this.fetchBrokerFlow(type, { a: 1470, b: 1470, c: 'B', d: day }), // 台灣摩根士丹利
     ]);
 
     const result = this.overlapBrokers([r1, r2], {

@@ -23,7 +23,7 @@ export class CrawlerController {
   // 券商進出（固定：台灣摩根士丹利 1470）
   @Get('broker-flow-morgan-stanley')
   async brokerFlowMorganStanley() {
-    const data = await this.crawler.fetchBrokerFlow({
+    const data = await this.crawler.fetchBrokerFlow('D', {
       a: 1470,
       b: 1470,
       c: 'B',
@@ -35,7 +35,7 @@ export class CrawlerController {
   // 券商進出（固定：新加坡商瑞銀 1650）
   @Get('broker-flow-singapore')
   async brokerFlowSingapore() {
-    const data = await this.crawler.fetchBrokerFlow({
+    const data = await this.crawler.fetchBrokerFlow('D', {
       a: 1650,
       b: 1650,
       c: 'B',
