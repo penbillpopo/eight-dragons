@@ -1,5 +1,5 @@
 // src/crawler/crawler.controller.ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { CrawlerService } from './crawler.service';
 
 @Controller('crawler')
@@ -9,7 +9,14 @@ export class CrawlerController {
   // 投信買超一日
   @Get('trust-buy-daily')
   async trustBuyDaily() {
-    const data = await this.crawler.fetchTrustInvestListed('1');
+    const data = await this.crawler.fetchTrustInvestListed('D', '1');
+    return { count: data.length, data };
+  }
+
+  // 投信賣超一日
+  @Get('trust-sell-daily')
+  async trustSellDaily() {
+    const data = await this.crawler.fetchTrustInvestListed('E', '1');
     return { count: data.length, data };
   }
 
@@ -37,9 +44,12 @@ export class CrawlerController {
     return { count: data.length, data };
   }
 
-  // 三家同時買超（固定三家：1470、1650 + 投信(估)）
-  @Get('overlap-three-fixed')
-  async overlapThreeFixed() {
-    return await this.crawler.getOverlapAllFixed_a(1);
+  // 三家同時買/賣超（固定三家：1470、1650 + 投信(估)）
+  @Get('overlap-three-fixed/:action')
+  async overlapThreeFixed(@Param('action') action: 'buy' | 'sell') {
+    if (action !== 'buy' && action !== 'sell') {
+      throw new NotFoundException('Action must be "buy" or "sell"');
+    }
+    return await this.crawler.getOverlapAllFixed_a(1, action);
   }
 }
