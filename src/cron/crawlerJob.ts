@@ -189,13 +189,26 @@ export class CrawlerJob {
 
   // ---------- UI helpers ----------
   private buildHeader(): string {
-    // 這裡用當下時間當「報表生成時間」
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mi = String(now.getMinutes()).padStart(2, '0');
+    const tz = 'Asia/Taipei';
+    const dtf = new Intl.DateTimeFormat('zh-TW', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    const parts = Object.fromEntries(
+      dtf.formatToParts(new Date()).map((p) => [p.type, p.value]),
+    );
+
+    const yyyy = parts.year;
+    const mm = parts.month;
+    const dd = parts.day;
+    const hh = parts.hour;
+    const mi = parts.minute;
 
     return `📅 ${yyyy}/${mm}/${dd} ${hh}:${mi} 券商重疊觀察彙整`;
   }
