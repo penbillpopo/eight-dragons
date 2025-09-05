@@ -211,7 +211,7 @@ export class CrawlerService {
     });
   }
 
-  /** 投信上市買超一日 */
+  /** 投信上市爬蟲 */
   private async _fetchTrustInvestDaily(url: string): Promise<TrustBuyRow[]> {
     const html = await this.fetchHtml(url);
     const $ = cheerio.load(html);
@@ -257,7 +257,7 @@ export class CrawlerService {
     return rows.filter((r) => r.code !== '').sort((a, b) => a.rank - b.rank);
   }
 
-  /** 投信上櫃買超一日 */
+  /** 投信上櫃爬蟲 */
   private async _fetchTrustInvestOTC(url: string): Promise<TrustBuyRow[]> {
     const html = await this.fetchHtml(url);
     const $ = cheerio.load(html);
@@ -721,4 +721,3 @@ export class CrawlerService {
     return `${y}-${mm}-${dd}`; // -> 2025-08-25
   }
 }
-
