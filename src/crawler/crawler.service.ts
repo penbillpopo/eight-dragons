@@ -161,7 +161,7 @@ export class CrawlerService {
     day: string,
   ): Promise<TrustBuyRow[]> {
     const url = `https://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_D${type}_1_${day}.djhtm`;
-    return this._fetchTrustInvestDaily(url);
+    return this._fetchTrustInvestOTC(url);
   }
 
   /** 券商進出（參數化） */
@@ -211,7 +211,7 @@ export class CrawlerService {
     });
   }
 
-  /** 投信買超一日 */
+  /** 投信上市買超一日 */
   private async _fetchTrustInvestDaily(url: string): Promise<TrustBuyRow[]> {
     const html = await this.fetchHtml(url);
     const $ = cheerio.load(html);
@@ -223,6 +223,52 @@ export class CrawlerService {
     $('table tr').each((_, tr) => {
       const tds = $(tr).find('td');
       if (tds.length < 8) return;
+
+      const rankTxt = $(tds[0]).text().trim();
+      const rank = Number.parseInt(rankTxt, 10);
+      if (!Number.isFinite(rank)) return;
+
+      const nameCode = $(tds[1]).text().trim(); // 例如 "2330 台積電"
+      const [code, ...nameParts] = nameCode.split(/\s+/);
+      if (!code) return;
+      const name = nameParts.join(' ').trim();
+
+      const close = this.toNumber($(tds[2]).text());
+      const change = $(tds[3]).text().trim();
+      const changePct = $(tds[4]).text().trim();
+      const buy = this.toNumber($(tds[5]).text());
+      const sell = this.toNumber($(tds[6]).text());
+      const net = this.toNumber($(tds[7]).text());
+
+      rows.push({
+        date,
+        rank,
+        code,
+        name,
+        close,
+        change,
+        changePct,
+        buy,
+        sell,
+        net,
+      });
+    });
+
+    return rows.filter((r) => r.code !== '').sort((a, b) => a.rank - b.rank);
+  }
+
+  /** 投信上櫃買超一日 */
+  private async _fetchTrustInvestOTC(url: string): Promise<TrustBuyRow[]> {
+    const html = await this.fetchHtml(url);
+    const $ = cheerio.load(html);
+
+    const rows: TrustBuyRow[] = [];
+
+    const date = this.dateForTrustInvest(html) || '';
+
+    $('table tr').each((_, tr) => {
+      const tds = $(tr).find('td');
+      if (tds.length < 6) return;
 
       const rankTxt = $(tds[0]).text().trim();
       const rank = Number.parseInt(rankTxt, 10);
@@ -675,3 +721,4 @@ export class CrawlerService {
     return `${y}-${mm}-${dd}`; // -> 2025-08-25
   }
 }
+

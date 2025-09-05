@@ -6,10 +6,17 @@ import { CrawlerService } from './crawler.service';
 export class CrawlerController {
   constructor(private readonly crawler: CrawlerService) {}
 
-  // 投信買超一日
+  // 投信買賣超一日(上市)
   @Get('trust-buy-daily')
   async trustBuyDaily() {
     const data = await this.crawler.fetchTrustInvestListed('D', '1');
+    return { count: data.length, data };
+  }
+
+  // 投信買賣超一日(上櫃)
+  @Get('trust-buy-daily2')
+  async trustBuyDaily2() {
+    const data = await this.crawler.fetchTrustInvestOTC('D', '1');
     return { count: data.length, data };
   }
 
@@ -53,3 +60,4 @@ export class CrawlerController {
     return await this.crawler.getOverlapAllFixed_a(1, action);
   }
 }
+
