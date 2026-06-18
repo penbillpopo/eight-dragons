@@ -27,16 +27,17 @@ type TwseStockInfo = {
 };
 
 @Injectable()
-export class TsmcStockPriceTask implements CronTask {
-  private readonly logger = new Logger(TsmcStockPriceTask.name);
-  private readonly stockInfoUrl =
-    'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_2330.tw&json=1&delay=0';
+export class StockPriceTask implements CronTask {
+  private readonly logger = new Logger(StockPriceTask.name);
+  private readonly stockInfoBaseUrl =
+    'https://mis.twse.com.tw/stock/api/getStockInfo.jsp';
+  private readonly defaultStocks = ['3481', '2327', '2383', '3037', '6415'];
 
   constructor(private readonly lineService: LineService) {}
 
   async run() {
-    const stock = await this.fetchTsmcStockInfo();
-    const message = this.buildMessage(stock);
+    const stocks = await this.fetchStockInfo();
+    const message = this.buildMessage(stocks);
 
     await this.lineService.pushToGroup(
       process.env.LINE_GROUP_ID ?? '',
@@ -44,10 +45,13 @@ export class TsmcStockPriceTask implements CronTask {
     );
   }
 
-  private async fetchTsmcStockInfo(): Promise<TwseStockInfo> {
-    const res = await fetch(this.stockInfoUrl, {
+  private async fetchStockInfo(): Promise<TwseStockInfo[]> {
+    const stockKeys = this.getStockKeys();
+    const url = `${this.stockInfoBaseUrl}?ex_ch=${stockKeys.join('|')}&json=1&delay=0`;
+
+    const res = await fetch(url, {
       headers: {
-        Referer: 'https://mis.twse.com.tw/stock/fibest.jsp?stock=2330',
+        Referer: 'https://mis.twse.com.tw/stock/fibest.jsp',
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
       },
@@ -58,38 +62,61 @@ export class TsmcStockPriceTask implements CronTask {
     }
 
     const data = (await res.json()) as TwseStockInfoResponse;
-    const stock = data.msgArray?.[0];
+    const stocks = data.msgArray ?? [];
 
     if (data.rtcode && data.rtcode !== '0000') {
       throw new Error(`TWSE stock API error: ${data.rtcode} ${data.rtmessage}`);
     }
 
-    if (!stock) {
+    if (stocks.length === 0) {
       this.logger.error(JSON.stringify(data));
       throw new Error('TWSE stock API returned empty stock info');
     }
 
-    return stock;
+    return stocks;
   }
 
-  private buildMessage(stock: TwseStockInfo): string {
-    const name = stock.n ?? '台積電';
-    const code = stock.c ?? '2330';
+  private getStockKeys(): string[] {
+    const symbols = (process.env.STOCK_SYMBOLS ?? '')
+      .split(',')
+      .map((symbol) => symbol.trim())
+      .filter(Boolean);
+
+    const stocks = symbols.length > 0 ? symbols : this.defaultStocks;
+
+    return stocks.map((stock) => {
+      if (stock.includes('_')) return stock;
+
+      return `tse_${stock}.tw`;
+    });
+  }
+
+  private buildMessage(stocks: TwseStockInfo[]): string {
+    const blocks = stocks.map((stock) => this.buildStockBlock(stock));
+    const latest = stocks[0];
+
+    return [
+      ...blocks,
+      '',
+      `資料時間：${this.formatDateTime(latest?.d, latest?.t)}`,
+    ].join('\n');
+  }
+
+  private buildStockBlock(stock: TwseStockInfo): string {
+    const name = stock.n ?? '-';
+    const code = stock.c ?? '-';
     const priceValue = this.resolveCurrentPrice(stock);
     const price = this.formatPrice(priceValue);
     const previousClose = this.toNumber(stock.y);
     const change = priceValue - previousClose;
-    const changePercent =
-      previousClose === 0 ? 0 : (change / previousClose) * 100;
     const sign = change > 0 ? '+' : '';
 
     return [
-      `台積電即時股價 ${name}(${code})`,
+      `股票：${name}(${code})`,
       `現價：${price}`,
-      `漲跌：${sign}${this.formatNumber(change)} (${sign}${this.formatNumber(changePercent)}%)`,
-      `開高低：${this.formatPrice(stock.o)} / ${this.formatPrice(stock.h)} / ${this.formatPrice(stock.l)}`,
-      `成交量：${this.formatVolume(stock.v)} 張`,
-      `資料時間：${this.formatDateTime(stock.d, stock.t)}`,
+      `昨日收盤價：${this.formatPrice(stock.y)}`,
+      `漲跌：${sign}${this.formatNumber(change)}`,
+      '--------------------------',
     ].join('\n');
   }
 
@@ -113,13 +140,6 @@ export class TsmcStockPriceTask implements CronTask {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
-  }
-
-  private formatVolume(value?: string): string {
-    const n = Number.parseInt(value ?? '', 10);
-    if (!Number.isFinite(n)) return '-';
-
-    return new Intl.NumberFormat('zh-TW').format(n);
   }
 
   private formatDateTime(date?: string, time?: string): string {
