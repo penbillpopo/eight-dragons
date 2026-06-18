@@ -31,7 +31,14 @@ export class StockPriceTask implements CronTask {
   private readonly logger = new Logger(StockPriceTask.name);
   private readonly stockInfoBaseUrl =
     'https://mis.twse.com.tw/stock/api/getStockInfo.jsp';
-  private readonly defaultStocks = ['3481', '2327', '2383', '3037', '6415'];
+  private readonly defaultStocks = [
+    '2330',
+    '3481',
+    '2327',
+    '2383',
+    '3037',
+    '6415',
+  ];
 
   constructor(private readonly lineService: LineService) {}
 
