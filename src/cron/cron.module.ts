@@ -1,11 +1,19 @@
 // src/jobs/jobs.module.ts
 import { Module } from '@nestjs/common';
-import { CrawlerModule } from '../crawler/crawler.module';
 import { LineModule } from '../line/line.module';
 import { CrawlerJob } from './crawlerJob';
+import { TsmcStockPriceTask } from './tsmcStockPriceTask.service';
+import { CRON_TASK } from './types';
 
 @Module({
-  imports: [CrawlerModule, LineModule],
-  providers: [CrawlerJob],
+  imports: [LineModule],
+  providers: [
+    CrawlerJob,
+    TsmcStockPriceTask,
+    {
+      provide: CRON_TASK,
+      useExisting: TsmcStockPriceTask,
+    },
+  ],
 })
 export class JobsModule {}
