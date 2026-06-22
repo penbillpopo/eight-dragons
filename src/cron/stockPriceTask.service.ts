@@ -114,32 +114,41 @@ export class StockPriceTask implements CronTask {
     const code = stock.c ?? '-';
     const priceValue = this.resolveCurrentPrice(stock);
     const price = this.formatPrice(priceValue);
-    const previousClose = this.toNumber(stock.y);
-    const change = priceValue - previousClose;
-    const sign = change > 0 ? '+' : '';
+    const previousClose = this.parseNumber(stock.y);
+    const change =
+      priceValue !== null && previousClose !== null
+        ? priceValue - previousClose
+        : null;
 
     return [
       `股票：${name}(${code})`,
       `現價：${price}`,
       `昨日收盤價：${this.formatPrice(stock.y)}`,
-      `漲跌：${sign}${this.formatNumber(change)}`,
+      `漲跌：${this.formatChange(change)}`,
       '--------------------------',
     ].join('\n');
   }
 
-  private toNumber(value?: string | number): number {
+  private parseNumber(value?: string | number | null): number | null {
     const n =
       typeof value === 'number' ? value : Number.parseFloat(value ?? '');
-    return Number.isFinite(n) ? n : 0;
+    return Number.isFinite(n) ? n : null;
   }
 
-  private resolveCurrentPrice(stock: TwseStockInfo): number {
-    return this.toNumber(stock.z) || this.toNumber(stock.pz);
+  private resolveCurrentPrice(stock: TwseStockInfo): number | null {
+    return this.parseNumber(stock.z) ?? this.parseNumber(stock.pz);
   }
 
-  private formatPrice(value?: string | number): string {
-    const n = this.toNumber(value);
-    return n === 0 ? '-' : this.formatNumber(n);
+  private formatPrice(value?: string | number | null): string {
+    const n = this.parseNumber(value);
+    return n === null ? '-' : this.formatNumber(n);
+  }
+
+  private formatChange(value: number | null): string {
+    if (value === null) return '-';
+
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${this.formatNumber(value)}`;
   }
 
   private formatNumber(value: number): string {
