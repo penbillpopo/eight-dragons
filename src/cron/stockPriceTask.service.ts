@@ -17,6 +17,8 @@ type TwseStockInfo = {
   n?: string;
   z?: string;
   pz?: string;
+  a?: string;
+  b?: string;
   y?: string;
   o?: string;
   h?: string;
@@ -119,10 +121,13 @@ export class StockPriceTask implements CronTask {
       priceValue !== null && previousClose !== null
         ? priceValue - previousClose
         : null;
+    const quoteLine =
+      priceValue === null ? [`買一/賣一：${this.formatBestBidAsk(stock)}`] : [];
 
     return [
       `股票：${name}(${code})`,
       `現價：${price}`,
+      ...quoteLine,
       `昨日收盤價：${this.formatPrice(stock.y)}`,
       `漲跌：${this.formatChange(change)}`,
       '--------------------------',
@@ -137,6 +142,17 @@ export class StockPriceTask implements CronTask {
 
   private resolveCurrentPrice(stock: TwseStockInfo): number | null {
     return this.parseNumber(stock.z) ?? this.parseNumber(stock.pz);
+  }
+
+  private formatBestBidAsk(stock: TwseStockInfo): string {
+    const bid = this.parseFirstPrice(stock.b);
+    const ask = this.parseFirstPrice(stock.a);
+
+    return `${this.formatPrice(bid)} / ${this.formatPrice(ask)}`;
+  }
+
+  private parseFirstPrice(value?: string): number | null {
+    return this.parseNumber(value?.split('_')[0]);
   }
 
   private formatPrice(value?: string | number | null): string {
